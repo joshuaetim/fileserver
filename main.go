@@ -11,10 +11,12 @@ import (
 	"html/template"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,6 +36,35 @@ type File struct {
 	ModifiedDate time.Time
 	Size         int
 	IsDir        bool
+}
+
+func getLocalIpAddr() (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			ipStr := ip.String()
+			if ip != nil && ip.To4() != nil && !strings.HasPrefix(ipStr, "127") {
+				return ipStr, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("ip not found")
 }
 
 func getFolderSize(dir string, ctx context.Context) int64 {
@@ -78,12 +109,15 @@ func displayFilesFromDir(dir string) ([]File, error) {
 
 	var files []File
 	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
 		size := info.Size()
-		name := entry.Name()
 		fullEntryPath := filepath.Join(fullpath, name)
 
 		if info.IsDir() {
@@ -135,6 +169,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	localIP, err := getLocalIpAddr()
+	if err != nil {
+		log.Fatal(err)
+	}
+	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
+
 	mux.Handle("/download/", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
@@ -148,7 +188,10 @@ func main() {
 			return
 		}
 
-		err = tmpl.Execute(w, struct{ Files []File }{Files: files})
+		err = tmpl.Execute(w, struct {
+			Files []File
+			Addr  string
+		}{Files: files, Addr: localIP})
 		if err != nil {
 			panic(err)
 		}
