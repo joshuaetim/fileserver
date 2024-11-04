@@ -8,15 +8,10 @@
 <body>
     <h2>Books in /dir</h2>
     <ul>
-        <li><a href="#">Book 1</a></li>
-        <li><a href="#">Book 2</a></li>
-        <li><a href="#">Book 3</a></li>
-        <li><a href="#">Book 4</a></li>
-        <li><a href="#">Book 5</a></li>
-        <li><a href="#">Book 6</a></li>
-        <li><a href="#">Book 7</a></li>
-        <li><a href="#">Book 8</a></li>
-
+        {{ range .Files }}
+        
+        <li><a href="download{{.Path}}">{{.Name}}</a></li>
+        {{ end }}
     </ul>
 </body>
 </html>

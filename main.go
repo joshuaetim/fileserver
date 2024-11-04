@@ -5,6 +5,7 @@ It also displays all the files sorting them by date added
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -28,24 +29,41 @@ type config struct {
 }
 
 type File struct {
+	Path         string
 	Name         string
 	ModifiedDate time.Time
 	Size         int
 	IsDir        bool
 }
 
-func getFolderSize(dir string) int64 {
+func getFolderSize(dir string, ctx context.Context) int64 {
 	var totalSize int64
-	filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			totalSize += info.Size()
-		}
-		return nil
-	})
-	return totalSize
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				totalSize += info.Size()
+			}
+			return nil
+		})
+	}()
+
+	select {
+	case <-done:
+		return totalSize
+	case <-ctx.Done():
+		return 0
+	}
 }
 
 func displayFilesFromDir(dir string) ([]File, error) {
@@ -64,10 +82,23 @@ func displayFilesFromDir(dir string) ([]File, error) {
 		if err != nil {
 			continue
 		}
+		size := info.Size()
+		name := entry.Name()
+		fullEntryPath := filepath.Join(fullpath, name)
+
+		if info.IsDir() {
+			ctx, _ := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			retrievedSize := getFolderSize(fullEntryPath, ctx)
+			if retrievedSize != 0 {
+				size = retrievedSize
+			}
+		}
+
 		file := File{
-			Name:         entry.Name(),
+			Path:         fullEntryPath,
+			Name:         name,
 			ModifiedDate: info.ModTime(),
-			Size:         int(info.Size()),
+			Size:         int(size),
 			IsDir:        info.IsDir(),
 		}
 		files = append(files, file)
@@ -92,30 +123,31 @@ func main() {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
+
+	var input string
+	fmt.Print("enter path of book (press enter for current directory): ")
+	fmt.Scanln(&input)
+
+	if input == "" {
+		input = "."
+	}
+
+	mux.Handle("/download", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := tmpl.Execute(w, nil)
-		if err != nil {
-			panic(err)
-		}
 
 		// print file details
-		booksDir := "/Users/joshuaetim/Documents/books"
+
+		// booksDir := "/Users/joshuaetim/Documents/books"
+		booksDir := input
 		files, err := displayFilesFromDir(booksDir)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		if files == nil {
-			log.Println("no files found")
-			return
-		}
 
-		for _, file := range files {
-			fmt.Println("name:", file.Name)
-			fmt.Println("size:", file.Size)
-			fmt.Println("date:", file.ModifiedDate)
-			fmt.Println("dir:", file.IsDir)
-
+		err = tmpl.Execute(w, struct{ Files []File }{Files: files})
+		if err != nil {
+			panic(err)
 		}
 	})
 
