@@ -125,14 +125,17 @@ func main() {
 	mux := http.NewServeMux()
 
 	var input string
-	fmt.Print("enter path of book (press enter for current directory): ")
+	homeDir, _ := os.UserHomeDir()
+	fmt.Printf("enter path of book (relative to %s): ", homeDir)
 	fmt.Scanln(&input)
 
-	if input == "" {
-		input = "."
+	input = filepath.Join(homeDir, input)
+	_, err = os.Stat(input)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	mux.Handle("/download", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
+	mux.Handle("/download/", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		// print file details
