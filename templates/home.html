@@ -12,7 +12,7 @@
     <ul>
         {{ range .Files }}
         
-        <li><a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} download/{{ .Path }} {{  end }}">{{.Name}}</a></li>
+        <li><a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} {{ .Name }}?path={{.Path}} {{  end }}">{{.Name}}</a></li>
         {{ end }}
     </ul>
 </body>

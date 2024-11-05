@@ -72,14 +72,31 @@ func main() {
 	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
 
 	mux := http.NewServeMux()
-	mux.Handle("/download/", http.StripPrefix("/download"+homeDir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fullpath := r.URL.Path
-		fmt.Println(fullpath)
-		name := filepath.Base(fullpath)
-		fmt.Println(name)
-		w.Header().Set("Content-Disposition", "attachment; filename="+name)
-		http.FileServer(http.Dir(homeDir)).ServeHTTP(w, r)
-	})))
+
+	mux.Handle("/{name}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// this will serve /Book_Name.epub (because Kobo browser does not support my headers)
+		// name is just the base name of the book
+		// a path will be in the query featuring the actual full path of the book
+
+		fullpath := r.URL.Query().Get("path")
+		if fullpath == "" {
+			return
+		}
+
+		// // ensure they don't go past root directory
+		if !strings.HasPrefix(fullpath, homeDir) {
+			return
+		}
+
+		// // remove the home directory
+		prefixLen := len(homeDir)
+
+		newRequest := r.WithContext(r.Context())
+		newRequest.URL.Path = fullpath[prefixLen:]
+
+		http.FileServer(http.Dir(homeDir)).ServeHTTP(w, newRequest)
+	}))
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		booksDir := input
 		query := r.URL.Query().Get("path")
@@ -125,9 +142,17 @@ func main() {
 	})
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
+
+	srv := http.Server{
+		Addr:    addr,
+		Handler: mux,
+		ConnState: func(c net.Conn, cs http.ConnState) {
+			// log.Println(c.LocalAddr(), c.RemoteAddr(), cs.String())
+		},
+	}
 	go func() {
-		err = http.ListenAndServe(addr, mux)
-		if err != nil {
+		err = srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
@@ -138,6 +163,9 @@ func main() {
 
 	<-stopSig
 	fmt.Println("\rstop signal received, terminating...")
+	if err := srv.Shutdown(context.Background()); err != nil {
+		log.Fatal(err)
+	}
 
 }
 
