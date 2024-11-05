@@ -7,10 +7,12 @@
 </head>
 <body>
     <h2>Enter <a href="http://{{.Addr}}">{{.Addr}} </a> in your URL</h2>
+    <h3>{{.CurrentPath}}</h3> 
+    {{ if eq .CurrentPath .Root }} {{ else }} <a href="?path={{ .CurrentPath | stripLast }}">Go Back</a> {{ end }}
     <ul>
         {{ range .Files }}
         
-        <li><a href="download{{.Path}}">{{.Name}}</a></li>
+        <li><a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} download/{{ .Path }} {{  end }}">{{.Name}}</a></li>
         {{ end }}
     </ul>
 </body>

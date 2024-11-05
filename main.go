@@ -49,14 +49,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tmpl, err := template.New("home").Parse(string(home))
+	tmpl, err := template.New("home").Funcs(template.FuncMap{"stripLast": getDirectory}).Parse(string(home))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var input string
 	homeDir, _ := os.UserHomeDir()
-	fmt.Printf("enter path of book (relative to %s): ", homeDir)
+	fmt.Printf("enter path of book: (press enter for default home)  %s/", homeDir)
 	fmt.Scanln(&input)
 
 	input = filepath.Join(homeDir, input)
@@ -72,9 +72,41 @@ func main() {
 	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
 
 	mux := http.NewServeMux()
-	mux.Handle("/download/", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
+	mux.Handle("/download/", http.StripPrefix("/download"+homeDir, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fullpath := r.URL.Path
+		fmt.Println(fullpath)
+		name := filepath.Base(fullpath)
+		fmt.Println(name)
+		w.Header().Set("Content-Disposition", "attachment; filename="+name)
+		http.FileServer(http.Dir(homeDir)).ServeHTTP(w, r)
+	})))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		booksDir := input
+		query := r.URL.Query().Get("path")
+		if query != "" {
+			booksDir = query
+		}
+
+		// ensure they don't go past root directory
+		if !strings.HasPrefix(booksDir, homeDir) {
+			booksDir = homeDir
+		}
+
+		// check if is dir
+		stat, err := os.Stat(booksDir)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		// if file, download
+		if !stat.IsDir() {
+			name := stat.Name()
+			w.Header().Set("Content-Disposition", "attachment; filename = "+name)
+			w.Header().Set("Content-Type", "application/octet-stream")
+			http.ServeFile(w, r, booksDir)
+			return
+		}
+
 		files, err := displayFilesFromDir(booksDir)
 		if err != nil {
 			log.Println(err)
@@ -82,9 +114,11 @@ func main() {
 		}
 
 		err = tmpl.Execute(w, struct {
-			Files []File
-			Addr  string
-		}{Files: files, Addr: localIP})
+			Root        string
+			CurrentPath string
+			Files       []File
+			Addr        string
+		}{Files: files, Addr: localIP, CurrentPath: booksDir, Root: homeDir})
 		if err != nil {
 			panic(err)
 		}
@@ -133,7 +167,7 @@ func getLocalIpAddr() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("ip not found")
+	return "", fmt.Errorf("ip not found. Please connect to a network")
 }
 
 func getFolderSize(dir string, ctx context.Context) int64 {
@@ -208,4 +242,8 @@ func displayFilesFromDir(dir string) ([]File, error) {
 	}
 
 	return files, nil
+}
+
+func getDirectory(dir string) string {
+	return filepath.Dir(dir)
 }
