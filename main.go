@@ -38,6 +38,75 @@ type File struct {
 	IsDir        bool
 }
 
+func main() {
+	cfg, err := env.ParseAs[config]()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	home, err := htmlFiles.ReadFile("templates/home.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tmpl, err := template.New("home").Parse(string(home))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var input string
+	homeDir, _ := os.UserHomeDir()
+	fmt.Printf("enter path of book (relative to %s): ", homeDir)
+	fmt.Scanln(&input)
+
+	input = filepath.Join(homeDir, input)
+	_, err = os.Stat(input)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	localIP, err := getLocalIpAddr()
+	if err != nil {
+		log.Fatal(err)
+	}
+	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
+
+	mux := http.NewServeMux()
+	mux.Handle("/download/", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		booksDir := input
+		files, err := displayFilesFromDir(booksDir)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		err = tmpl.Execute(w, struct {
+			Files []File
+			Addr  string
+		}{Files: files, Addr: localIP})
+		if err != nil {
+			panic(err)
+		}
+	})
+
+	addr := fmt.Sprintf(":%s", cfg.Port)
+	go func() {
+		err = http.ListenAndServe(addr, mux)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	fmt.Println("server started on ", addr)
+
+	stopSig := make(chan os.Signal, 1)
+	signal.Notify(stopSig, os.Interrupt, syscall.SIGTERM)
+
+	<-stopSig
+	fmt.Println("\rstop signal received, terminating...")
+
+}
+
 func getLocalIpAddr() (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -139,78 +208,4 @@ func displayFilesFromDir(dir string) ([]File, error) {
 	}
 
 	return files, nil
-}
-
-func main() {
-	cfg, err := env.ParseAs[config]()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	home, err := htmlFiles.ReadFile("templates/home.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	tmpl, err := template.New("home").Parse(string(home))
-	if err != nil {
-		log.Fatal(err)
-	}
-	mux := http.NewServeMux()
-
-	var input string
-	homeDir, _ := os.UserHomeDir()
-	fmt.Printf("enter path of book (relative to %s): ", homeDir)
-	fmt.Scanln(&input)
-
-	input = filepath.Join(homeDir, input)
-	_, err = os.Stat(input)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	localIP, err := getLocalIpAddr()
-	if err != nil {
-		log.Fatal(err)
-	}
-	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
-
-	mux.Handle("/download/", http.StripPrefix("/download", http.FileServer(http.Dir("/"))))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
-		// print file details
-
-		// booksDir := "/Users/joshuaetim/Documents/books"
-		booksDir := input
-		files, err := displayFilesFromDir(booksDir)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		err = tmpl.Execute(w, struct {
-			Files []File
-			Addr  string
-		}{Files: files, Addr: localIP})
-		if err != nil {
-			panic(err)
-		}
-	})
-
-	addr := fmt.Sprintf(":%s", cfg.Port)
-
-	go func() {
-		err = http.ListenAndServe(addr, mux)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	fmt.Println("server started on ", addr)
-
-	stopSig := make(chan os.Signal, 1)
-	signal.Notify(stopSig, os.Interrupt, syscall.SIGTERM)
-
-	<-stopSig
-	fmt.Println("\rstop signal received, terminating...")
-
 }
