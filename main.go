@@ -157,7 +157,7 @@ func main() {
 		}
 	}()
 	fmt.Println("server started on ", srv.Addr)
-	fmt.Printf("Enter http://%s in your browser", localIP)
+	fmt.Printf("Enter http://%s in your browser\n", localIP)
 
 	stopSig := make(chan os.Signal, 1)
 	signal.Notify(stopSig, os.Interrupt, syscall.SIGTERM)
