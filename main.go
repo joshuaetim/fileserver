@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -34,8 +35,16 @@ type File struct {
 	Path         string
 	Name         string
 	ModifiedDate time.Time
-	Size         int
+	Size         string
 	IsDir        bool
+}
+
+var SortBy string = "date"
+
+func ByModifiedDate(files []File) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[j].ModifiedDate.Before(files[i].ModifiedDate)
+	})
 }
 
 func main() {
@@ -57,7 +66,7 @@ func main() {
 	var input string
 	homeDir, _ := os.UserHomeDir()
 	fmt.Printf("enter path of book: (press enter for default home)  %s/", homeDir)
-	fmt.Scanln(&input)
+	// fmt.Scanln(&input)
 
 	input = filepath.Join(homeDir, input)
 	_, err = os.Stat(input)
@@ -130,12 +139,21 @@ func main() {
 			return
 		}
 
+		sortBy := r.URL.Query().Get("sort_by")
+		if sortBy != "" {
+			SortBy = sortBy
+		}
+		if sortBy != "alphabetical" {
+			ByModifiedDate(files)
+		}
+
 		err = tmpl.Execute(w, struct {
 			Root        string
 			CurrentPath string
 			Files       []File
 			Addr        string
-		}{Files: files, Addr: localIP, CurrentPath: booksDir, Root: homeDir})
+			Sorted      string
+		}{Files: files, Addr: localIP, CurrentPath: booksDir, Root: homeDir, Sorted: SortBy})
 		if err != nil {
 			panic(err)
 		}
@@ -156,6 +174,15 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+	asciiWelcome := `
+__        __   _                                    
+\ \      / /__| | ___ ___  _ __ ___   ___    
+ \ \ /\ / / _ \ |/ __/ _ \| '_ ' _ \ / _ \    
+  \ V  V /  __/ | (_| (_) | | | | | |  __/
+   \_/\_/ \___|_|\___\___/|_| |_| |_|\___|
+
+`
+	fmt.Println(asciiWelcome)
 	fmt.Println("server started on ", srv.Addr)
 	fmt.Printf("Enter http://%s in your browser\n", localIP)
 
@@ -229,6 +256,22 @@ func getFolderSize(dir string, ctx context.Context) int64 {
 	}
 }
 
+func formatFileSize(size int64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+	)
+
+	switch {
+	case size >= MB:
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(MB))
+	case size >= KB:
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(KB))
+	default:
+		return fmt.Sprintf("%d Bytes", size)
+	}
+}
+
 func displayFilesFromDir(dir string) ([]File, error) {
 	fullpath, err := filepath.Abs(dir)
 	if err != nil {
@@ -253,7 +296,7 @@ func displayFilesFromDir(dir string) ([]File, error) {
 		fullEntryPath := filepath.Join(fullpath, name)
 
 		if info.IsDir() {
-			ctx, _ := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			retrievedSize := getFolderSize(fullEntryPath, ctx)
 			if retrievedSize != 0 {
 				size = retrievedSize
@@ -264,7 +307,7 @@ func displayFilesFromDir(dir string) ([]File, error) {
 			Path:         fullEntryPath,
 			Name:         name,
 			ModifiedDate: info.ModTime(),
-			Size:         int(size),
+			Size:         formatFileSize(size),
 			IsDir:        info.IsDir(),
 		}
 		files = append(files, file)

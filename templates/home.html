@@ -4,15 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Server</title>
+    <style>
+        .filebox {
+            padding: 10px 8px 2px;
+            margin-bottom: 10px;
+            width: auto;
+            line-height: 6px;
+            align-items: center;
+            font-size: large;
+        }
+        .redbox {
+            background-color: rgba(237, 212, 212, 0.4);
+        }
+
+        .greenbox {
+            background-color: rgba(151, 226, 171, 0.4);
+        }
+
+        .sort {
+            font-weight: bolder;
+        }
+    </style>
 </head>
 <body>
     <h2>Enter <a href="http://{{.Addr}}">{{.Addr}} </a> in your URL</h2>
-    <h3>{{.CurrentPath}}</h3> 
-    {{ if eq .CurrentPath .Root }} {{ else }} <a href="?path={{ .CurrentPath | stripLast }}">Go Back</a> {{ end }}
+    <h3>{{.CurrentPath}} {{ if eq .CurrentPath .Root }} - HOME {{ else }} {{end}}</h3> 
+    {{ if eq .CurrentPath .Root }} {{ else }} <a href="?path={{ .CurrentPath | stripLast }}" style="font-size: large;">Go Back</a> {{ end }}
+    <p class="sort">
+        {{ if eq .Sorted "alphabetical" }}
+        <a href="?path={{.CurrentPath}}&sort_by=date" style="font-size: large;">Sorted by Name. Switch to Sort by Date.</a>
+        {{ else }}
+        <a href="?path={{.CurrentPath}}&sort_by=alphabetical" style="font-size: large;">Sorted by Date. Switch to Sort by Name.</a>
+
+        {{ end }}
+    </p>
     <ul>
         {{ range .Files }}
         
-        <li><a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} {{ .Name }}?path={{.Path}} {{  end }}">{{.Name}}{{if .IsDir}}/ {{else}} {{end}}</a></li>
+        <li class="filebox {{if .IsDir}} redbox {{else}} greenbox {{end}}">
+            <a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} {{ .Name }}?path={{.Path}} {{  end }}">{{.Name}}{{if .IsDir}}/ {{else}} {{end}}</a>
+            {{if .IsDir}}
+            <p>Folder</p>
+            {{else}}
+            <p>Size: {{ .Size }}</p>
+            {{end}}
+            <p>Date Modified: {{ .ModifiedDate }}</p>
+        </li>
         {{ end }}
     </ul>
 </body>
