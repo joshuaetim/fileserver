@@ -101,7 +101,9 @@ func main() {
 		prefixLen := len(homeDir)
 
 		newRequest := r.WithContext(r.Context())
-		newRequest.URL.Path = fullpath[prefixLen:]
+		urlPath := filepath.ToSlash(fullpath[prefixLen:])
+
+		newRequest.URL.Path = urlPath
 
 		http.FileServer(http.Dir(homeDir)).ServeHTTP(w, newRequest)
 	}))
@@ -143,7 +145,7 @@ func main() {
 		if sortBy != "" {
 			SortBy = sortBy
 		}
-		if sortBy != "alphabetical" {
+		if SortBy != "alphabetical" {
 			ByModifiedDate(files)
 		}
 
@@ -159,7 +161,7 @@ func main() {
 		}
 	})
 
-	addr := fmt.Sprintf(":%s", cfg.Port)
+	addr := fmt.Sprintf("0.0.0.0:%s", cfg.Port)
 
 	srv := http.Server{
 		Addr:    addr,
