@@ -66,7 +66,7 @@ func main() {
 	var input string
 	homeDir, _ := os.UserHomeDir()
 	fmt.Printf("enter path of book: (press enter for default home)  %s/", homeDir)
-	// fmt.Scanln(&input)
+	fmt.Scanln(&input)
 
 	input = filepath.Join(homeDir, input)
 	_, err = os.Stat(input)
