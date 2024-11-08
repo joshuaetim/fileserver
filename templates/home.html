@@ -9,7 +9,7 @@
             padding: 10px 8px 2px;
             margin-bottom: 10px;
             width: auto;
-            line-height: 6px;
+            /* line-height: 6px; */
             align-items: center;
             font-size: large;
         }
@@ -44,11 +44,11 @@
         <li class="filebox {{if .IsDir}} redbox {{else}} greenbox {{end}}">
             <a href="{{ if .IsDir }} ?path={{.Path}} {{ else }} {{ .Name }}?path={{.Path}} {{  end }}">{{.Name}}{{if .IsDir}}/ {{else}} {{end}}</a>
             {{if .IsDir}}
-            <p>Folder</p>
+            <br>Folder
             {{else}}
-            <p>Size: {{ .Size }}</p>
+            <br> Size: {{ .Size }}
             {{end}}
-            <p>Date Modified: {{ .ModifiedDate }}</p>
+            <br> Date Modified: {{ .ModifiedDate }}
         </li>
         {{ end }}
     </ul>
