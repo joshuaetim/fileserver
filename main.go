@@ -120,21 +120,6 @@ func main() {
 			booksDir = homeDir
 		}
 
-		// check if is dir
-		stat, err := os.Stat(booksDir)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		// if file, download
-		if !stat.IsDir() {
-			name := stat.Name()
-			w.Header().Set("Content-Disposition", "attachment; filename = "+name)
-			w.Header().Set("Content-Type", "application/octet-stream")
-			http.ServeFile(w, r, booksDir)
-			return
-		}
-
 		files, err := displayFilesFromDir(booksDir)
 		if err != nil {
 			log.Println(err)
@@ -166,9 +151,6 @@ func main() {
 	srv := http.Server{
 		Addr:    addr,
 		Handler: mux,
-		ConnState: func(c net.Conn, cs http.ConnState) {
-			// log.Println(c.LocalAddr(), c.RemoteAddr(), cs.String())
-		},
 	}
 	go func() {
 		err = srv.ListenAndServe()
