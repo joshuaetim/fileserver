@@ -1,6 +1,6 @@
 # Fileserver
 
-Fileserver serves your files over your private network. It is great for sharing resources over your network, including your workstations, mobile devices, and e-readers, removing the need to upload to an intermediate server like Google Drive or Dropbox.
+Fileserver serves your files over your private network. It is great for sharing resources over your network, including your workstations, mobile devices, and e-readers like Kobo, removing the need to upload to an intermediate server like Google Drive or Dropbox. Fileserver is written in Go and it uses NO EXTERNAL LIBRARIES.
 
 ## Installation
 
