@@ -20,16 +20,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/caarlos0/env/v11"
 )
 
 //go:embed templates/*.html
 var htmlFiles embed.FS
-
-type config struct {
-	Port string `env:"PORT" envDefault:"3000"`
-}
 
 type File struct {
 	Path         string
@@ -47,10 +41,16 @@ func ByModifiedDate(files []File) {
 	})
 }
 
+func ByName(files []File) {
+	sort.Slice(files, func(i, j int) bool {
+		return strings.ToLower(files[i].Name) < strings.ToLower(files[j].Name)
+	})
+}
+
 func main() {
-	cfg, err := env.ParseAs[config]()
-	if err != nil {
-		log.Fatal(err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
 	}
 
 	home, err := htmlFiles.ReadFile("templates/home.html")
@@ -78,7 +78,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	localIP = fmt.Sprintf("%s:%s", localIP, cfg.Port)
+	localIP = fmt.Sprintf("%s:%s", localIP, port)
 
 	mux := http.NewServeMux()
 
@@ -130,7 +130,9 @@ func main() {
 		if sortBy != "" {
 			SortBy = sortBy
 		}
-		if SortBy != "alphabetical" {
+		if SortBy == "alphabetical" {
+			ByName(files)
+		} else {
 			ByModifiedDate(files)
 		}
 
@@ -146,7 +148,7 @@ func main() {
 		}
 	})
 
-	addr := fmt.Sprintf("0.0.0.0:%s", cfg.Port)
+	addr := fmt.Sprintf("0.0.0.0:%s", port)
 
 	srv := http.Server{
 		Addr:    addr,
