@@ -34,6 +34,7 @@ type File struct {
 }
 
 var SortBy string = "date"
+var Path string // to store path incase of search
 
 func ByModifiedDate(files []File) {
 	sort.Slice(files, func(i, j int) bool {
@@ -113,6 +114,13 @@ func main() {
 		query := r.URL.Query().Get("path")
 		if query != "" {
 			booksDir = query
+			Path = query
+		}
+
+		search := r.URL.Query().Get("search")
+		// HTML will remove the path query on search, this restores it.
+		if search != "" {
+			booksDir = Path
 		}
 
 		// ensure they don't go past root directory
@@ -120,7 +128,7 @@ func main() {
 			booksDir = homeDir
 		}
 
-		files, err := displayFilesFromDir(booksDir)
+		files, err := displayFilesFromDir(booksDir, search)
 		if err != nil {
 			log.Println(err)
 			return
@@ -258,7 +266,7 @@ func formatFileSize(size int64) string {
 	}
 }
 
-func displayFilesFromDir(dir string) ([]File, error) {
+func displayFilesFromDir(dir, search string) ([]File, error) {
 	fullpath, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -287,6 +295,10 @@ func displayFilesFromDir(dir string) ([]File, error) {
 			if retrievedSize != 0 {
 				size = retrievedSize
 			}
+		}
+
+		if !strings.Contains(strings.ToLower(name), strings.ToLower(search)) {
+			continue
 		}
 
 		file := File{

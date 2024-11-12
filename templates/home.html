@@ -38,6 +38,11 @@
 
         {{ end }}
     </p>
+    <form method="get" action="">
+        <input type="text" name="search" id="search-input" placeholder="Search in this path..." />
+        <button type="submit">Search</button>
+    </form>
+
     <ul>
         {{ range .Files }}
         
